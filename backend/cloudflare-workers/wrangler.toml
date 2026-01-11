@@ -1,0 +1,64 @@
+name = "laporsunsal-api"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# ============================================
+# CLOUDFLARE R2 STORAGE (untuk avatar/foto)
+# ============================================
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "laporsunsal"
+
+# ============================================
+# ENVIRONMENT VARIABLES
+# ============================================
+[vars]
+# URL Google Apps Script Web App (database backend)
+GAS_URL = "https://script.google.com/macros/s/AKfycbwhWbhAoz_ziCF1jQ--CAThZ8gedlZaJnDe-o3CRGDDCZMe1ENF4JPsGjqRfl4QfkZuog/exec"
+
+# Frontend URL (Production)
+APP_URL = "https://laporsunsal.vercel.app"
+
+# R2 Public URL
+R2_PUBLIC_URL = "https://pub-1ea96c38d3bb4c92a8a6d1292d20cd0e.r2.dev"
+
+# Sender info untuk email
+SENDER_NAME = "LaporSunsal"
+SENDER_EMAIL = "kantorsunsal@gmail.com"
+
+# ============================================
+# SECRETS (Set via: wrangler secret put)
+# ============================================
+# wrangler secret put JWT_SECRET
+# wrangler secret put BREVO_API_KEY
+# wrangler secret put SENDER_EMAIL
+
+# ============================================
+# DEPLOYMENT COMMANDS
+# ============================================
+# 1. Install dependencies:
+#    npm install bcryptjs @tsndr/cloudflare-worker-jwt
+#
+# 2. Set secrets:
+#    wrangler secret put JWT_SECRET
+#    wrangler secret put BREVO_API_KEY
+#
+# 3. Deploy:
+#    wrangler deploy
+#
+# 4. Local dev:
+#    wrangler dev
+
+# ============================================
+# NOTE: Database menggunakan Google Sheets
+# ============================================
+# Semua data disimpan di Google Sheets melalui Apps Script API.
+# Tidak perlu setup D1 database.
+#
+# Ganti GAS_URL dengan URL deployment Apps Script Anda.
+# Setup Apps Script:
+# 1. Buka Google Spreadsheet
+# 2. Extensions > Apps Script
+# 3. Paste code dari Setup.gs
+# 4. Deploy > New deployment > Web app
+# 5. Copy URL dan paste di GAS_URL
