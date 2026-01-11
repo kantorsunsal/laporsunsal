@@ -847,6 +847,115 @@ async function handleProxy(request, env) {
   return jsonResponse(result, result.success ? 200 : 400);
 }
 
+/**
+ * Handle submit_confirmation dengan upload gambar ke R2
+ */
+async function handleSubmitConfirmation(request, env) {
+  console.log("=== SUBMIT CONFIRMATION HANDLER ===");
+
+  try {
+    const contentType = request.headers.get("content-type") || "";
+    let confirmationData = {};
+    let imageUrl = null;
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+
+      // Parse JSON data from 'data' field
+      const dataField = formData.get("data");
+      if (dataField) {
+        try {
+          confirmationData = JSON.parse(dataField);
+        } catch (e) {
+          console.error("Failed to parse data field:", e);
+        }
+      }
+
+      // Get proof image file
+      const proofImage = formData.get("proof_image");
+
+      // Upload proof image to R2 if present
+      if (proofImage && proofImage.size > 0 && env.R2_BUCKET) {
+        console.log("Uploading proof image to R2...");
+        console.log("File name:", proofImage.name);
+        console.log("File size:", proofImage.size);
+        console.log("File type:", proofImage.type);
+
+        const allowedTypes = [
+          "image/jpeg",
+          "image/png",
+          "image/webp",
+          "image/gif",
+        ];
+
+        if (!allowedTypes.includes(proofImage.type)) {
+          return jsonResponse(
+            {
+              success: false,
+              error: "Format file tidak didukung. Gunakan JPG, PNG, WebP, atau GIF.",
+            },
+            400
+          );
+        }
+
+        if (proofImage.size > 10 * 1024 * 1024) {
+          return jsonResponse(
+            {
+              success: false,
+              error: "Ukuran file maksimal 10MB",
+            },
+            400
+          );
+        }
+
+        const ext = proofImage.name?.split(".").pop() || "jpg";
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substring(2, 8);
+        const filename = `proofs/${timestamp}-${random}.${ext}`;
+
+        await env.R2_BUCKET.put(filename, proofImage.stream(), {
+          httpMetadata: { contentType: proofImage.type },
+        });
+
+        const r2PublicUrl = env.R2_PUBLIC_URL || "https://pub-1ea96c38d3bb4c92a8a6d1292d20cd0e.r2.dev";
+        imageUrl = `${r2PublicUrl}/${filename}`;
+
+        console.log("✅ Image uploaded to R2:", imageUrl);
+      } else {
+        console.log("⚠️ No proof_image found or R2_BUCKET not configured");
+        console.log("proofImage exists:", !!proofImage);
+        console.log("proofImage size:", proofImage?.size);
+        console.log("R2_BUCKET exists:", !!env.R2_BUCKET);
+      }
+    } else {
+      // Handle JSON body (fallback)
+      confirmationData = await parseBody(request);
+    }
+
+    // Add image_url to confirmation data
+    if (imageUrl) {
+      confirmationData.image_url = imageUrl;
+    }
+
+    // Forward to Google Apps Script
+    console.log("Forwarding to GAS with data:", JSON.stringify({
+      ...confirmationData,
+      image_url: imageUrl || "(not uploaded)"
+    }));
+
+    const result = await callGoogleSheetsAPI(env, "submit_confirmation", confirmationData);
+
+    return jsonResponse(result, result.success ? 200 : 400);
+
+  } catch (error) {
+    console.error("Submit confirmation error:", error);
+    return jsonResponse(
+      { success: false, error: "Terjadi kesalahan saat mengirim konfirmasi: " + error.message },
+      500
+    );
+  }
+}
+
 // ============================================
 // ROUTER
 // ============================================
@@ -894,6 +1003,29 @@ async function handleRequest(request, env, _ctx) {
   // Proxy ke Apps Script untuk semua action lainnya
   // Support both /api and root "/" for backward compatibility
   if ((path === "/api" || path === "/") && method === "POST") {
+    // Check if this is a submit_confirmation with file upload
+    const contentType = request.headers.get("content-type") || "";
+
+    if (contentType.includes("multipart/form-data")) {
+      // For multipart, we need to check the action in the 'data' field
+      // Clone request since we might need to read body twice
+      const clonedRequest = request.clone();
+      const formData = await clonedRequest.formData();
+      const dataField = formData.get("data");
+
+      if (dataField) {
+        try {
+          const data = JSON.parse(dataField);
+          if (data.action === "submit_confirmation") {
+            console.log("Routing to handleSubmitConfirmation");
+            return handleSubmitConfirmation(request, env);
+          }
+        } catch (e) {
+          console.error("Error parsing data field:", e);
+        }
+      }
+    }
+
     return handleProxy(request, env);
   }
 
