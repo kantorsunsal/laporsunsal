@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,11 +18,13 @@ interface Setting {
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [settings, setSettings] = useState<Setting[]>([]);
   const [editedSettings, setEditedSettings] = useState<Record<string, string>>(
     {}
   );
-
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const fetchSettings = useCallback(async () => {
     try {
       const token = localStorage.getItem("admin_token");
@@ -110,6 +112,105 @@ export default function SettingsPage() {
     return key.includes("secret") || key.includes("key");
   };
 
+  // Set logo preview dari settings yang ada
+  useEffect(() => {
+    const logoUrl = editedSettings["app_logo_url"];
+    if (logoUrl) {
+      setLogoPreview(logoUrl);
+    }
+  }, [editedSettings]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validasi file
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error(
+        "Format file tidak didukung. Gunakan JPG, PNG, WebP, atau GIF."
+      );
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Ukuran file maksimal 2MB");
+      return;
+    }
+
+    setUploadingLogo(true);
+
+    try {
+      const token = localStorage.getItem("admin_token");
+
+      // Upload to R2 via Worker
+      const formData = new FormData();
+      formData.append("avatar", file);
+      formData.append("name", "logo");
+      formData.append("lembaga", "system");
+
+      // Use user/update endpoint which already handles R2 upload
+      // We'll create a dedicated endpoint or reuse the mechanism
+      const response = await fetch(`${API_URL}/api`, {
+        method: "POST",
+        body: (() => {
+          const fd = new FormData();
+          fd.append(
+            "data",
+            JSON.stringify({
+              action: "upload_logo",
+              token: token,
+            })
+          );
+          fd.append("logo_image", file);
+          return fd;
+        })(),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.logo_url) {
+        setLogoPreview(result.logo_url);
+        handleChange("app_logo_url", result.logo_url);
+        toast.success("Logo berhasil diupload. Jangan lupa simpan perubahan!");
+      } else {
+        // Fallback: convert to base64 data URL (untuk demo, sebaiknya pakai R2)
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string;
+          setLogoPreview(dataUrl);
+          handleChange("app_logo_url", dataUrl);
+          toast.success(
+            "Logo berhasil diupload. Jangan lupa simpan perubahan!"
+          );
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (error) {
+      console.error("Logo upload error:", error);
+      // Fallback to base64
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        setLogoPreview(dataUrl);
+        handleChange("app_logo_url", dataUrl);
+        toast.success("Logo berhasil diupload (local). Jangan lupa simpan!");
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoPreview(null);
+    handleChange("app_logo_url", "");
+    if (logoInputRef.current) {
+      logoInputRef.current.value = "";
+    }
+    toast.info("Logo dihapus. Jangan lupa simpan perubahan!");
+  };
+
   if (loading) {
     return (
       <div className="p-4 lg:p-8 flex items-center justify-center min-h-[50vh]">
@@ -148,6 +249,96 @@ export default function SettingsPage() {
             </>
           )}
         </Button>
+      </div>
+
+      {/* Logo Upload Section */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div className="p-4 lg:p-6 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
+          <span className="material-symbols-outlined text-blue-600">image</span>
+          <h2 className="text-lg font-bold">Logo Aplikasi</h2>
+        </div>
+
+        <div className="p-4 lg:p-6">
+          <div className="flex flex-col md:flex-row gap-6 items-start">
+            {/* Preview */}
+            <div className="flex flex-col items-center">
+              <div className="w-24 h-24 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center overflow-hidden border-2 border-dashed border-slate-300 dark:border-slate-600">
+                {logoPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoPreview}
+                    alt="Logo Preview"
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <span className="material-symbols-outlined text-4xl text-slate-400">
+                    add_photo_alternate
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-2">Preview Logo</p>
+            </div>
+
+            {/* Upload Controls */}
+            <div className="flex-1 space-y-4">
+              <div>
+                <Label className="font-semibold text-sm mb-2 block">
+                  Upload Logo Baru
+                </Label>
+                <p className="text-xs text-slate-500 mb-3">
+                  Logo akan ditampilkan di halaman login, lupa password, dan
+                  dashboard.
+                  <br />
+                  Format: JPG, PNG, WebP, GIF. Maksimal 2MB.
+                </p>
+                <div className="flex gap-3">
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                    id="logo-upload"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={uploadingLogo}
+                    className="rounded-xl"
+                  >
+                    {uploadingLogo ? (
+                      <>
+                        <div className="h-4 w-4 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mr-2" />
+                        Mengupload...
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined mr-2 text-lg">
+                          upload
+                        </span>
+                        Pilih Gambar
+                      </>
+                    )}
+                  </Button>
+                  {logoPreview && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleRemoveLogo}
+                      className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <span className="material-symbols-outlined mr-2 text-lg">
+                        delete
+                      </span>
+                      Hapus Logo
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Settings Form */}

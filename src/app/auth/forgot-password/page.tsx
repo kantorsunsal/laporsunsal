@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,7 +89,7 @@ function ForgotPasswordForm() {
       <Button
         type="submit"
         disabled={loading}
-        className="w-full h-12 rounded-xl font-bold bg-orange-500 hover:bg-orange-600"
+        className="w-full h-12 rounded-xl font-bold"
       >
         {loading ? "Memproses..." : "Kirim Link Reset"}
       </Button>
@@ -107,15 +107,46 @@ function ForgotPasswordForm() {
 }
 
 export default function UserForgotPasswordPage() {
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const GAS_URL =
+    "https://script.google.com/macros/s/AKfycbxAAPB7h3-aoy9195uSwB3gWOw8-wlIVEnZmpjqOjD7k4Q8Ovo3EN8NteZ6vYDI1bgwvg/exec";
+
+  // Fetch logo from public settings
+  useEffect(() => {
+    const fetchLogo = async () => {
+      try {
+        const response = await fetch(`${GAS_URL}?action=get_public_settings`);
+        const result = await response.json();
+        if (result.success && result.data?.app_logo_url) {
+          setLogoUrl(result.data.app_logo_url);
+        }
+      } catch (error) {
+        console.error("Failed to fetch logo:", error);
+      }
+    };
+    fetchLogo();
+  }, []);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="text-center pb-2">
-          <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-orange-500 flex items-center justify-center">
-            <span className="material-symbols-outlined text-white text-3xl">
-              lock_reset
-            </span>
-          </div>
+          {logoUrl ? (
+            <div className="mx-auto mb-4 h-20 w-20">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logoUrl}
+                alt="Logo"
+                className="w-full h-full object-contain rounded-2xl"
+              />
+            </div>
+          ) : (
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-blue-600 flex items-center justify-center">
+              <span className="material-symbols-outlined text-white text-3xl">
+                lock_reset
+              </span>
+            </div>
+          )}
           <CardTitle className="text-2xl font-bold">Lupa Password</CardTitle>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Masukkan email untuk reset password

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,8 @@ import { toast } from "sonner";
 
 // Ganti dengan URL Web App GAS Auth Anda
 const AUTH_API_URL = "https://laporsunsal-api.kantorsunsal.workers.dev";
+const GAS_URL =
+  "https://script.google.com/macros/s/AKfycbxAAPB7h3-aoy9195uSwB3gWOw8-wlIVEnZmpjqOjD7k4Q8Ovo3EN8NteZ6vYDI1bgwvg/exec";
 
 interface AuthFormProps {
   onAuthSuccess: (user: User) => void;
@@ -26,6 +28,7 @@ interface User {
 
 export default function AuthForm({ onAuthSuccess }: AuthFormProps) {
   const [loading, setLoading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   // Login State
   const [loginEmail, setLoginEmail] = useState("");
@@ -38,8 +41,23 @@ export default function AuthForm({ onAuthSuccess }: AuthFormProps) {
     password: "",
     confirmPassword: "",
     phone: "",
-    lembaga: "",
   });
+
+  // Fetch logo from public settings
+  useEffect(() => {
+    const fetchLogo = async () => {
+      try {
+        const response = await fetch(`${GAS_URL}?action=get_public_settings`);
+        const result = await response.json();
+        if (result.success && result.data?.app_logo_url) {
+          setLogoUrl(result.data.app_logo_url);
+        }
+      } catch (error) {
+        console.error("Failed to fetch logo:", error);
+      }
+    };
+    fetchLogo();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +127,6 @@ export default function AuthForm({ onAuthSuccess }: AuthFormProps) {
           email: registerData.email,
           password: registerData.password,
           phone: registerData.phone,
-          lembaga: registerData.lembaga,
         }),
       });
 
@@ -124,7 +141,9 @@ export default function AuthForm({ onAuthSuccess }: AuthFormProps) {
 
       if (result.success) {
         // Jangan langsung login, tampilkan pesan untuk verifikasi email
-        toast.success("Registrasi berhasil! Silakan cek email untuk verifikasi.");
+        toast.success(
+          "Registrasi berhasil! Silakan cek email untuk verifikasi."
+        );
         // Reset form
         setRegisterData({
           nama: "",
@@ -132,10 +151,11 @@ export default function AuthForm({ onAuthSuccess }: AuthFormProps) {
           password: "",
           confirmPassword: "",
           phone: "",
-          lembaga: "",
         });
         // Optional: tampilkan info tambahan
-        toast.info("Link verifikasi telah dikirim ke email Anda", { duration: 5000 });
+        toast.info("Link verifikasi telah dikirim ke email Anda", {
+          duration: 5000,
+        });
       } else {
         toast.error(result.error || "Registrasi gagal");
       }
@@ -151,11 +171,22 @@ export default function AuthForm({ onAuthSuccess }: AuthFormProps) {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="text-center pb-2">
-          <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-blue-600 flex items-center justify-center">
-            <span className="material-symbols-outlined text-white text-3xl">
-              school
-            </span>
-          </div>
+          {logoUrl ? (
+            <div className="mx-auto mb-4 h-20 w-20">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logoUrl}
+                alt="Logo"
+                className="w-full h-full object-contain rounded-2xl"
+              />
+            </div>
+          ) : (
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-blue-600 flex items-center justify-center">
+              <span className="material-symbols-outlined text-white text-3xl">
+                school
+              </span>
+            </div>
+          )}
           <CardTitle className="text-2xl font-bold">LaporSunsal</CardTitle>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Konfirmasi Pembayaran Yayasan Sunniyah Salafiyah
@@ -204,7 +235,7 @@ export default function AuthForm({ onAuthSuccess }: AuthFormProps) {
                 >
                   {loading ? "Memproses..." : "Masuk"}
                 </Button>
-                <div className="text-center">
+                <div className="text-right">
                   <Link
                     href="/auth/forgot-password"
                     className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
@@ -296,21 +327,7 @@ export default function AuthForm({ onAuthSuccess }: AuthFormProps) {
                     className="h-12 rounded-xl"
                   />
                 </div>
-                <div>
-                  <Label className="mb-2 block">Lembaga/Instansi</Label>
-                  <Input
-                    type="text"
-                    placeholder="Nama sekolah/pondok"
-                    value={registerData.lembaga}
-                    onChange={(e) =>
-                      setRegisterData({
-                        ...registerData,
-                        lembaga: e.target.value,
-                      })
-                    }
-                    className="h-12 rounded-xl"
-                  />
-                </div>
+
                 <Button
                   type="submit"
                   disabled={loading}

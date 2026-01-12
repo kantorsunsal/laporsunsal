@@ -140,6 +140,7 @@ const DB_CONFIG = {
       new Date(),
     ],
     ["admin_email", "", "Email admin untuk notifikasi", new Date()],
+    ["app_logo_url", "", "URL logo aplikasi (upload di Settings)", new Date()],
   ],
 
   // Data awal untuk lembaga (contoh)
@@ -793,6 +794,8 @@ function doGet(e) {
       });
     case "get_lembaga":
       return handleGetLembaga();
+    case "get_public_settings":
+      return handleGetPublicSettings();
     default:
       return jsonResponse({
         status: "OK",
@@ -1164,54 +1167,61 @@ function handleGetDashboardStats(data) {
 
   let totalAmount = 0;
   let pendingCount = 0;
-  let latestDate = null;
+  let lastPaymentDate = null; // Tanggal bayar terakhir dari transaksi Verified
   const activities = [];
 
   for (let i = 1; i < rows.length; i++) {
     const rowUserId = String(rows[i][1]).trim();
     if (rowUserId !== user_id) continue;
 
-    // New column structure with Jenis_Bukti at index 9:
+    // Column structure:
     // A (0): ID
     // B (1): User_ID
-    // C (2): Tanggal_Bayar
+    // C (2): Tanggal_Bayar - tanggal transfer/VA/tunai sesuai struk
     // D (3): Metode
     // E (4): Bank_Penerima
     // F (5): Nama_Penerima
     // G (6): Nominal
     // H (7): Bank_Pengirim
     // I (8): Nama_Pengirim
-    // J (9): Jenis_Bukti - NEW
+    // J (9): Jenis_Bukti
     // K (10): Bukti_URL
     // L (11): Keterangan
     // M (12): Status
-    // N (13): Created
+    // N (13): Created - tanggal upload (BUKAN tanggal transaksi)
     // Q (16): Santri_ID
     // R (17): Santri_Nama
 
     const amountStr = String(rows[i][6]).replace(/[^\d]/g, "");
     const amount = parseInt(amountStr) || 0;
     const status = rows[i][12]; // M: Status
+    const paymentDate = rows[i][2]; // C: Tanggal_Bayar (tanggal pada struk/bukti)
     const created = rows[i][13]; // N: Created
 
+    // Total amount dan lastPaymentDate hanya dari transaksi Verified
     if (status === "Verified") {
       totalAmount += amount;
+      
+      // Gunakan Tanggal_Bayar (bukan Created) untuk konfirmasi terakhir
+      if (paymentDate) {
+        const payDate = new Date(paymentDate);
+        if (!isNaN(payDate.getTime())) {
+          if (!lastPaymentDate || payDate > lastPaymentDate) {
+            lastPaymentDate = payDate;
+          }
+        }
+      }
     }
 
     if (status === "Pending") {
       pendingCount++;
     }
 
-    const currentDate = new Date(created);
-    if (!latestDate || currentDate > latestDate) {
-      latestDate = currentDate;
-    }
-
     activities.push({
       id: rows[i][0],
       title: rows[i][11] || "Pembayaran", // L: Keterangan
       status: status,
-      date: created,
+      date: paymentDate || created, // Prioritaskan Tanggal_Bayar
       bank: rows[i][7] || rows[i][4] || "-", // Bank Pengirim atau Penerima
       amount: amount,
       jenis_bukti: rows[i][9], // J: Jenis_Bukti
@@ -1227,7 +1237,7 @@ function handleGetDashboardStats(data) {
     data: {
       totalAmount: totalAmount,
       pendingCount: pendingCount,
-      lastConfirmationDate: latestDate,
+      lastConfirmationDate: lastPaymentDate, // Tanggal bayar terakhir dari transaksi Verified
       recentActivities: recentActivities,
     },
   });
@@ -2729,6 +2739,34 @@ function handleGetSettings(data) {
 }
 
 /**
+ * Handler untuk get public settings (tanpa auth)
+ * Hanya mengembalikan settings yang boleh diakses publik
+ */
+function handleGetPublicSettings() {
+  const sheet =
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Settings");
+
+  if (!sheet || sheet.getLastRow() <= 1) {
+    return jsonResponse({ success: true, data: {} });
+  }
+
+  const rows = sheet.getDataRange().getValues();
+  const publicSettings = {};
+  
+  // Daftar settings yang boleh diakses publik
+  const allowedKeys = ["app_name", "app_version", "app_logo_url"];
+
+  for (let i = 1; i < rows.length; i++) {
+    const key = rows[i][0];
+    if (allowedKeys.includes(key)) {
+      publicSettings[key] = rows[i][1];
+    }
+  }
+
+  return jsonResponse({ success: true, data: publicSettings });
+}
+
+/**
  * Handler untuk update settings (Super Admin only)
  */
 function handleUpdateSettings(data) {
@@ -2858,7 +2896,7 @@ function handleDeleteLog(data) {
  * Action: verify_email
  */
 function handleVerifyEmailToken(data) {
-  const { token } = data;
+  const token = data.token ? String(data.token).trim() : null;
 
   if (!token) {
     return jsonResponse({ success: false, error: "Token wajib diisi" });
@@ -2867,10 +2905,21 @@ function handleVerifyEmailToken(data) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
   const users = sheet.getDataRange().getValues();
 
+  // Debug logging
+  Logger.log("=== VERIFY EMAIL TOKEN ===");
+  Logger.log("Received token: " + token);
+  Logger.log("Token length: " + token.length);
+
   for (let i = 1; i < users.length; i++) {
     // verification_token ada di kolom 12 (index 11)
     // is_verified ada di kolom 11 (index 10)
-    if (users[i][11] === token) {
+    const storedToken = users[i][11] ? String(users[i][11]).trim() : "";
+    
+    Logger.log("Row " + (i+1) + " - Stored token: '" + storedToken + "' (length: " + storedToken.length + ")");
+    
+    if (storedToken && storedToken === token) {
+      Logger.log("✅ Token MATCH found at row " + (i+1));
+      
       // Set is_verified = 1 dan hapus token
       sheet.getRange(i + 1, 11).setValue(1); // is_verified (kolom 11)
       sheet.getRange(i + 1, 12).setValue(""); // hapus verification_token (kolom 12)
@@ -2893,6 +2942,8 @@ function handleVerifyEmailToken(data) {
     }
   }
 
+  Logger.log("❌ Token NOT FOUND in database");
+  
   return jsonResponse({
     success: false,
     error: "Token tidak valid atau sudah digunakan",

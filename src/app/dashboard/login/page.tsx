@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,14 +8,33 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 const AUTH_API_URL = "https://laporsunsal-api.kantorsunsal.workers.dev";
+const GAS_URL =
+  "https://script.google.com/macros/s/AKfycbxAAPB7h3-aoy9195uSwB3gWOw8-wlIVEnZmpjqOjD7k4Q8Ovo3EN8NteZ6vYDI1bgwvg/exec";
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
+
+  // Fetch logo from public settings
+  useEffect(() => {
+    const fetchLogo = async () => {
+      try {
+        const response = await fetch(`${GAS_URL}?action=get_public_settings`);
+        const result = await response.json();
+        if (result.success && result.data?.app_logo_url) {
+          setLogoUrl(result.data.app_logo_url);
+        }
+      } catch (error) {
+        console.error("Failed to fetch logo:", error);
+      }
+    };
+    fetchLogo();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,11 +92,22 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-md">
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-600/30">
-            <span className="material-symbols-outlined text-white text-3xl">
-              verified_user
-            </span>
-          </div>
+          {logoUrl ? (
+            <div className="w-20 h-20 mx-auto mb-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logoUrl}
+                alt="Logo"
+                className="w-full h-full object-contain rounded-2xl"
+              />
+            </div>
+          ) : (
+            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-600/30">
+              <span className="material-symbols-outlined text-white text-3xl">
+                verified_user
+              </span>
+            </div>
+          )}
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white">
             LaporSunsal Admin
           </h1>
@@ -139,7 +169,7 @@ export default function AdminLoginPage() {
           </form>
 
           {/* Forgot Password Link */}
-          <div className="mt-4 text-center">
+          <div className="mt-4 text-right">
             <a
               href="/dashboard/forgot-password"
               className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
