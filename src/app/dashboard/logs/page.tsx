@@ -289,9 +289,9 @@ export default function LogsPage() {
           {/* Select All & Delete Button */}
           {currentUserRole === "super_admin" && filteredLogs.length > 0 && (
             <div className="flex items-center gap-3">
-              <button
+              <label
                 onClick={toggleSelectAll}
-                className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors cursor-pointer"
               >
                 <span>{isAllSelected ? "Batal pilih" : "Pilih semua"}</span>
                 <Checkbox
@@ -299,7 +299,7 @@ export default function LogsPage() {
                   onCheckedChange={toggleSelectAll}
                   className="border-slate-300 dark:border-slate-600"
                 />
-              </button>
+              </label>
 
               {isSomeSelected && (
                 <Button
