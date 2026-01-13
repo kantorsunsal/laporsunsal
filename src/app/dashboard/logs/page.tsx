@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -29,8 +30,12 @@ export default function LogsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState("");
+
+  // Multi-select state
+  const [selectedLogIds, setSelectedLogIds] = useState<Set<number>>(new Set());
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -50,6 +55,7 @@ export default function LogsPage() {
 
       if (result.success) {
         setLogs(result.data || []);
+        setSelectedLogIds(new Set()); // Clear selection on refresh
       } else {
         toast.error(result.error || "Gagal memuat data");
       }
@@ -70,6 +76,42 @@ export default function LogsPage() {
       setCurrentUserRole(user.role);
     }
   }, [fetchLogs]);
+
+  // Filter logs
+  const filteredLogs = logs.filter(
+    (log) =>
+      log.action?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.user_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.details?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Toggle single log selection
+  const toggleLogSelection = (index: number) => {
+    const newSelection = new Set(selectedLogIds);
+    if (newSelection.has(index)) {
+      newSelection.delete(index);
+    } else {
+      newSelection.add(index);
+    }
+    setSelectedLogIds(newSelection);
+  };
+
+  // Toggle select all
+  const toggleSelectAll = () => {
+    if (selectedLogIds.size === filteredLogs.length) {
+      // Deselect all
+      setSelectedLogIds(new Set());
+    } else {
+      // Select all filtered logs
+      const allIndices = new Set(filteredLogs.map((_, index) => index));
+      setSelectedLogIds(allIndices);
+    }
+  };
+
+  // Check if all are selected
+  const isAllSelected =
+    filteredLogs.length > 0 && selectedLogIds.size === filteredLogs.length;
+  const isSomeSelected = selectedLogIds.size > 0;
 
   const handleDeleteLog = async () => {
     if (!selectedLog || selectedLog.row_index === undefined) return;
@@ -93,6 +135,47 @@ export default function LogsPage() {
       if (result.success) {
         toast.success("Log berhasil dihapus");
         setDeleteDialogOpen(false);
+        fetchLogs();
+      } else {
+        toast.error(result.error || "Gagal menghapus log");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Terjadi kesalahan");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedLogIds.size === 0) return;
+
+    setProcessing(true);
+    try {
+      const token = localStorage.getItem("admin_token");
+
+      // Get row indices sorted in descending order (delete from bottom to top to avoid index shifting)
+      const rowIndices = Array.from(selectedLogIds)
+        .map((index) => index + 2) // Convert to sheet row index (1-based + header)
+        .sort((a, b) => b - a);
+
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "delete_logs_bulk",
+          row_indices: rowIndices,
+          token: token,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(`${selectedLogIds.size} log berhasil dihapus`);
+        setBulkDeleteDialogOpen(false);
+        setSelectedLogIds(new Set());
         fetchLogs();
       } else {
         toast.error(result.error || "Gagal menghapus log");
@@ -154,13 +237,6 @@ export default function LogsPage() {
     );
   };
 
-  const filteredLogs = logs.filter(
-    (log) =>
-      log.action?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.user_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.details?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   return (
     <div className="p-4 lg:p-8 space-y-6">
       {/* Header */}
@@ -199,14 +275,47 @@ export default function LogsPage() {
 
       {/* Logs Table */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-        <div className="p-4 lg:p-6 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
-          <span className="material-symbols-outlined text-blue-600">
-            history
-          </span>
-          <h2 className="text-lg font-bold">Log Aktivitas</h2>
-          <span className="text-sm text-slate-400 ml-2">
-            ({filteredLogs.length})
-          </span>
+        <div className="p-4 lg:p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-blue-600">
+              history
+            </span>
+            <h2 className="text-lg font-bold">Log Aktivitas</h2>
+            <span className="text-sm text-slate-400 ml-2">
+              ({filteredLogs.length})
+            </span>
+          </div>
+
+          {/* Select All & Delete Button */}
+          {currentUserRole === "super_admin" && filteredLogs.length > 0 && (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={toggleSelectAll}
+                className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+              >
+                <span>{isAllSelected ? "Batal pilih" : "Pilih semua"}</span>
+                <Checkbox
+                  checked={isAllSelected}
+                  onCheckedChange={toggleSelectAll}
+                  className="border-slate-300 dark:border-slate-600"
+                />
+              </button>
+
+              {isSomeSelected && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setBulkDeleteDialogOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-sm">
+                    delete
+                  </span>
+                  Hapus ({selectedLogIds.size})
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -226,6 +335,15 @@ export default function LogsPage() {
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50/50 dark:bg-slate-900/50">
+                  {currentUserRole === "super_admin" && (
+                    <th className="px-4 lg:px-6 py-4 w-12">
+                      <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={toggleSelectAll}
+                        className="border-slate-300 dark:border-slate-600"
+                      />
+                    </th>
+                  )}
                   <th className="px-4 lg:px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     Waktu
                   </th>
@@ -249,8 +367,21 @@ export default function LogsPage() {
                 {filteredLogs.map((log, index) => (
                   <tr
                     key={index}
-                    className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors"
+                    className={`hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors ${
+                      selectedLogIds.has(index)
+                        ? "bg-blue-50 dark:bg-blue-900/20"
+                        : ""
+                    }`}
                   >
+                    {currentUserRole === "super_admin" && (
+                      <td className="px-4 lg:px-6 py-4">
+                        <Checkbox
+                          checked={selectedLogIds.has(index)}
+                          onCheckedChange={() => toggleLogSelection(index)}
+                          className="border-slate-300 dark:border-slate-600"
+                        />
+                      </td>
+                    )}
                     <td className="px-4 lg:px-6 py-4">
                       <p className="text-sm font-medium">
                         {formatDateTime(log.timestamp)}
@@ -295,7 +426,7 @@ export default function LogsPage() {
         )}
       </div>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Single Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -333,6 +464,49 @@ export default function LogsPage() {
               disabled={processing}
             >
               {processing ? "Menghapus..." : "Hapus"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog
+        open={bulkDeleteDialogOpen}
+        onOpenChange={setBulkDeleteDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus Log Terpilih</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+              <span className="material-symbols-outlined text-red-500 text-2xl">
+                warning
+              </span>
+              <div>
+                <p className="font-medium text-red-700 dark:text-red-400">
+                  Hapus {selectedLogIds.size} log terpilih?
+                </p>
+                <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                  Tindakan ini tidak dapat dibatalkan.
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBulkDeleteDialogOpen(false)}
+              disabled={processing}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkDelete}
+              disabled={processing}
+            >
+              {processing ? "Menghapus..." : `Hapus ${selectedLogIds.size} Log`}
             </Button>
           </DialogFooter>
         </DialogContent>

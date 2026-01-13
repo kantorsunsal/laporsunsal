@@ -8,7 +8,7 @@
  * - Database: Google Sheets (via Google Apps Script API)
  * - Email: Brevo (REST API)
  * - Storage: Cloudflare R2
- * - Libraries: bcryptjs, @tsndr/cloudflare-worker-jwt
+ * - Libraries: @tsndr/cloudflare-worker-jwt
  *
  * Endpoints:
  * - POST /auth/register
@@ -22,7 +22,6 @@
  * Note: Semua data disimpan di Google Sheets melalui Apps Script API
  */
 
-import bcrypt from "bcryptjs";
 import jwt from "@tsndr/cloudflare-worker-jwt";
 
 // ============================================
@@ -37,25 +36,13 @@ const CORS_HEADERS = {
 };
 
 const JWT_SECRET = "laporsunsal-jwt-secret-key-2026"; // Override via env.JWT_SECRET
-const JWT_EXPIRY = "7d";
-const BCRYPT_ROUNDS = 10;
 
-// Google Apps Script Web App URL (database backend)
 const DEFAULT_GAS_URL =
-  "https://script.google.com/macros/s/AKfycbwhWbhAoz_ziCF1jQ--CAThZ8gedlZaJnDe-o3CRGDDCZMe1ENF4JPsGjqRfl4QfkZuog/exec";
+  "https://script.google.com/macros/s/AKfycbw4f2llt5PmGdWXOrM1Bz0C4dCPXMMpNOmaoC_VwIOq6YsxVzFSuiWK9N9t7fil87JAcQ/exec";
 
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
-
-/**
- * Generate UUID v4 (reserved for future use)
- * @returns {string} UUID v4
- */
-// eslint-disable-next-line no-unused-vars
-function _generateUUID() {
-  return crypto.randomUUID();
-}
 
 /**
  * Generate random token untuk verifikasi/reset
@@ -116,29 +103,6 @@ async function parseBody(request) {
   } catch {
     return {};
   }
-}
-
-/**
- * Hash password dengan bcrypt (dilakukan di worker untuk keamanan)
- */
-async function hashPassword(password) {
-  return bcrypt.hash(password, BCRYPT_ROUNDS);
-}
-
-/**
- * Verify password dengan bcrypt (reserved - password verified in GAS)
- */
-// eslint-disable-next-line no-unused-vars
-async function _verifyPassword(password, hash) {
-  return bcrypt.compare(password, hash);
-}
-
-/**
- * Generate JWT token (reserved - token generated in GAS)
- */
-// eslint-disable-next-line no-unused-vars
-async function _generateJWT(payload, secret) {
-  return jwt.sign(payload, secret, { expiresIn: JWT_EXPIRY });
 }
 
 /**
@@ -216,7 +180,10 @@ async function callGoogleSheetsAPI(env, action, data = {}) {
     }
   } catch (error) {
     console.error("Google Sheets API error:", error);
-    return { success: false, error: "Database connection failed: " + error.message };
+    return {
+      success: false,
+      error: "Database connection failed: " + error.message,
+    };
   }
 }
 
@@ -241,8 +208,13 @@ async function sendEmail(env, to, subject, htmlContent) {
   console.log("API Key length:", BREVO_API_KEY ? BREVO_API_KEY.length : 0);
 
   if (!BREVO_API_KEY) {
-    console.error("❌ BREVO_API_KEY not configured - pastikan sudah menjalankan: wrangler secret put BREVO_API_KEY");
-    return { success: false, error: "Email service not configured - BREVO_API_KEY missing" };
+    console.error(
+      "❌ BREVO_API_KEY not configured - pastikan sudah menjalankan: wrangler secret put BREVO_API_KEY"
+    );
+    return {
+      success: false,
+      error: "Email service not configured - BREVO_API_KEY missing",
+    };
   }
 
   try {
@@ -467,7 +439,9 @@ async function handleRegister(request, env) {
 
       console.log("Email send result:", JSON.stringify(emailResult));
     } else {
-      console.log("⚠️ No verification_token received from GAS - email will NOT be sent");
+      console.log(
+        "⚠️ No verification_token received from GAS - email will NOT be sent"
+      );
     }
 
     return jsonResponse(
@@ -604,7 +578,10 @@ async function handleForgotPassword(request, env) {
     if (result.success && result.user) {
       const baseUrl = env.APP_URL || "https://laporsunsal.pages.dev";
       // Use dashboard or auth reset-password based on source
-      const resetPath = source === 'dashboard' ? '/dashboard/reset-password' : '/auth/reset-password';
+      const resetPath =
+        source === "dashboard"
+          ? "/dashboard/reset-password"
+          : "/auth/reset-password";
       const resetUrl = `${baseUrl}${resetPath}?token=${resetToken}`;
 
       console.log("🔥 Attempting to send reset email to:", email);
@@ -619,7 +596,12 @@ async function handleForgotPassword(request, env) {
 
       console.log("📧 Email send result:", JSON.stringify(emailResult));
     } else {
-      console.log("⚠️ Email NOT sent because result.success=", result.success, "result.user=", result.user);
+      console.log(
+        "⚠️ Email NOT sent because result.success=",
+        result.success,
+        "result.user=",
+        result.user
+      );
     }
 
     return jsonResponse({
@@ -892,7 +874,8 @@ async function handleSubmitConfirmation(request, env) {
           return jsonResponse(
             {
               success: false,
-              error: "Format file tidak didukung. Gunakan JPG, PNG, WebP, atau GIF.",
+              error:
+                "Format file tidak didukung. Gunakan JPG, PNG, WebP, atau GIF.",
             },
             400
           );
@@ -917,7 +900,9 @@ async function handleSubmitConfirmation(request, env) {
           httpMetadata: { contentType: proofImage.type },
         });
 
-        const r2PublicUrl = env.R2_PUBLIC_URL || "https://pub-1ea96c38d3bb4c92a8a6d1292d20cd0e.r2.dev";
+        const r2PublicUrl =
+          env.R2_PUBLIC_URL ||
+          "https://pub-1ea96c38d3bb4c92a8a6d1292d20cd0e.r2.dev";
         imageUrl = `${r2PublicUrl}/${filename}`;
 
         console.log("✅ Image uploaded to R2:", imageUrl);
@@ -938,19 +923,28 @@ async function handleSubmitConfirmation(request, env) {
     }
 
     // Forward to Google Apps Script
-    console.log("Forwarding to GAS with data:", JSON.stringify({
-      ...confirmationData,
-      image_url: imageUrl || "(not uploaded)"
-    }));
+    console.log(
+      "Forwarding to GAS with data:",
+      JSON.stringify({
+        ...confirmationData,
+        image_url: imageUrl || "(not uploaded)",
+      })
+    );
 
-    const result = await callGoogleSheetsAPI(env, "submit_confirmation", confirmationData);
+    const result = await callGoogleSheetsAPI(
+      env,
+      "submit_confirmation",
+      confirmationData
+    );
 
     return jsonResponse(result, result.success ? 200 : 400);
-
   } catch (error) {
     console.error("Submit confirmation error:", error);
     return jsonResponse(
-      { success: false, error: "Terjadi kesalahan saat mengirim konfirmasi: " + error.message },
+      {
+        success: false,
+        error: "Terjadi kesalahan saat mengirim konfirmasi: " + error.message,
+      },
       500
     );
   }
@@ -960,7 +954,7 @@ async function handleSubmitConfirmation(request, env) {
 // ROUTER
 // ============================================
 
-async function handleRequest(request, env, _ctx) {
+async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;

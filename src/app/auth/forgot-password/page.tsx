@@ -109,7 +109,7 @@ function ForgotPasswordForm() {
 export default function UserForgotPasswordPage() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const GAS_URL =
-    "https://script.google.com/macros/s/AKfycbxAAPB7h3-aoy9195uSwB3gWOw8-wlIVEnZmpjqOjD7k4Q8Ovo3EN8NteZ6vYDI1bgwvg/exec";
+    "https://script.google.com/macros/s/AKfycbw4f2llt5PmGdWXOrM1Bz0C4dCPXMMpNOmaoC_VwIOq6YsxVzFSuiWK9N9t7fil87JAcQ/exec";
 
   // Fetch logo from public settings
   useEffect(() => {

@@ -760,6 +760,8 @@ function doPost(e) {
         return handleGetLogs(data);
       case "delete_log":
         return handleDeleteLog(data);
+      case "delete_logs_bulk":
+        return handleDeleteLogsBulk(data);
 
       // Profile Actions
       case "change_password":
@@ -1201,7 +1203,7 @@ function handleGetDashboardStats(data) {
     // Total amount dan lastPaymentDate hanya dari transaksi Verified
     if (status === "Verified") {
       totalAmount += amount;
-      
+
       // Gunakan Tanggal_Bayar (bukan Created) untuk konfirmasi terakhir
       if (paymentDate) {
         const payDate = new Date(paymentDate);
@@ -2752,7 +2754,7 @@ function handleGetPublicSettings() {
 
   const rows = sheet.getDataRange().getValues();
   const publicSettings = {};
-  
+
   // Daftar settings yang boleh diakses publik
   const allowedKeys = ["app_name", "app_version", "app_logo_url"];
 
@@ -2887,6 +2889,67 @@ function handleDeleteLog(data) {
   return jsonResponse({ success: true, message: "Log berhasil dihapus" });
 }
 
+/**
+ * Handler untuk bulk delete logs (Super Admin only)
+ */
+function handleDeleteLogsBulk(data) {
+  const { token, row_indices } = data;
+
+  const decoded = decodeToken(token);
+  if (!decoded || decoded.expired) {
+    return jsonResponse({ success: false, error: "Token tidak valid" });
+  }
+
+  // Cek role - harus super_admin
+  const userRole = getUserRole(decoded.userId);
+  if (!hasPermission(userRole, "super_admin")) {
+    return jsonResponse({
+      success: false,
+      error: "Akses ditolak. Hanya super admin yang dapat menghapus log.",
+    });
+  }
+
+  if (!row_indices || !Array.isArray(row_indices) || row_indices.length === 0) {
+    return jsonResponse({
+      success: false,
+      error: "Tidak ada log yang dipilih",
+    });
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Logs");
+  if (!sheet) {
+    return jsonResponse({
+      success: false,
+      error: "Sheet Logs tidak ditemukan",
+    });
+  }
+
+  // Sort in descending order to delete from bottom to top (avoid index shifting)
+  const sortedIndices = [...row_indices].sort((a, b) => b - a);
+
+  let deletedCount = 0;
+  const lastRow = sheet.getLastRow();
+
+  for (const rowIndex of sortedIndices) {
+    if (rowIndex > 1 && rowIndex <= lastRow) {
+      sheet.deleteRow(rowIndex);
+      deletedCount++;
+    }
+  }
+
+  logActivity(
+    "DELETE_LOGS_BULK",
+    decoded.userId,
+    `Deleted ${deletedCount} logs`
+  );
+
+  return jsonResponse({
+    success: true,
+    message: `${deletedCount} log berhasil dihapus`,
+    deleted_count: deletedCount,
+  });
+}
+
 // ============================================
 // EMAIL VERIFICATION & PASSWORD RESET HANDLERS
 // ============================================
@@ -2914,12 +2977,20 @@ function handleVerifyEmailToken(data) {
     // verification_token ada di kolom 12 (index 11)
     // is_verified ada di kolom 11 (index 10)
     const storedToken = users[i][11] ? String(users[i][11]).trim() : "";
-    
-    Logger.log("Row " + (i+1) + " - Stored token: '" + storedToken + "' (length: " + storedToken.length + ")");
-    
+
+    Logger.log(
+      "Row " +
+        (i + 1) +
+        " - Stored token: '" +
+        storedToken +
+        "' (length: " +
+        storedToken.length +
+        ")"
+    );
+
     if (storedToken && storedToken === token) {
-      Logger.log("✅ Token MATCH found at row " + (i+1));
-      
+      Logger.log("✅ Token MATCH found at row " + (i + 1));
+
       // Set is_verified = 1 dan hapus token
       sheet.getRange(i + 1, 11).setValue(1); // is_verified (kolom 11)
       sheet.getRange(i + 1, 12).setValue(""); // hapus verification_token (kolom 12)
@@ -2943,7 +3014,7 @@ function handleVerifyEmailToken(data) {
   }
 
   Logger.log("❌ Token NOT FOUND in database");
-  
+
   return jsonResponse({
     success: false,
     error: "Token tidak valid atau sudah digunakan",
