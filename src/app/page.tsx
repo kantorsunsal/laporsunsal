@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useSyncExternalStore } from "react";
 import Home from "@/components/Home";
 import ConfirmationForm from "@/components/ConfirmationForm";
 import History from "@/components/History";
@@ -28,7 +28,21 @@ interface User {
   photo_url?: string;
 }
 
+// Hydration detection using useSyncExternalStore (React-recommended pattern)
+const emptySubscribe = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
+
+function useIsHydrated() {
+  return useSyncExternalStore(
+    emptySubscribe,
+    getClientSnapshot,
+    getServerSnapshot
+  );
+}
+
 export default function MainApp() {
+  const isHydrated = useIsHydrated();
   const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -46,12 +60,6 @@ export default function MainApp() {
     }
     return null;
   });
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Set loading to false after hydration
-  useEffect(() => {
-    setIsLoading(false);
-  }, []);
 
   const handleAuthSuccess = (loggedInUser: User) => {
     setUser(loggedInUser);
@@ -70,8 +78,8 @@ export default function MainApp() {
     setCurrentPage(Page.HOME);
   };
 
-  // Loading state
-  if (isLoading) {
+  // Loading state - wait for hydration
+  if (!isHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-950">
         <div className="text-center">

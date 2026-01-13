@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -55,7 +56,9 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProof, setSelectedProof] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"all" | "Pending" | "Verified" | "Rejected">("Pending");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "Pending" | "Verified" | "Rejected"
+  >("Pending");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -296,10 +299,14 @@ export default function DashboardPage() {
             <div className="flex flex-wrap items-center gap-3">
               {/* Status Dropdown */}
               <div className="flex items-center gap-2">
-                <label className="text-xs text-slate-500 font-medium">Status:</label>
+                <label className="text-xs text-slate-500 font-medium">
+                  Status:
+                </label>
                 <select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as typeof statusFilter)
+                  }
                   className="h-9 px-3 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 >
                   <option value="all">Semua</option>
@@ -310,7 +317,9 @@ export default function DashboardPage() {
               </div>
               {/* Date Range */}
               <div className="flex items-center gap-2">
-                <label className="text-xs text-slate-500 font-medium">Dari:</label>
+                <label className="text-xs text-slate-500 font-medium">
+                  Dari:
+                </label>
                 <input
                   type="date"
                   value={startDate}
@@ -319,7 +328,9 @@ export default function DashboardPage() {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-xs text-slate-500 font-medium">Sampai:</label>
+                <label className="text-xs text-slate-500 font-medium">
+                  Sampai:
+                </label>
                 <input
                   type="date"
                   value={endDate}
@@ -330,7 +341,10 @@ export default function DashboardPage() {
               {/* Clear Filters */}
               {(startDate || endDate) && (
                 <button
-                  onClick={() => { setStartDate(""); setEndDate(""); }}
+                  onClick={() => {
+                    setStartDate("");
+                    setEndDate("");
+                  }}
                   className="h-9 px-3 text-xs font-medium text-slate-500 hover:text-slate-700 bg-slate-100 dark:bg-slate-700 rounded-lg transition-colors"
                 >
                   Reset Tanggal
@@ -439,7 +453,11 @@ export default function DashboardPage() {
                         }`}
                       >
                         <span className="material-symbols-outlined text-xs">
-                          {conf.status === "Verified" ? "check_circle" : conf.status === "Rejected" ? "cancel" : "pending"}
+                          {conf.status === "Verified"
+                            ? "check_circle"
+                            : conf.status === "Rejected"
+                            ? "cancel"
+                            : "pending"}
                         </span>
                         {conf.status}
                       </span>
@@ -470,9 +488,7 @@ export default function DashboardPage() {
                         </div>
                       ) : (
                         <div className="text-right text-xs text-slate-400">
-                          {conf.verified_by && (
-                            <p>oleh: {conf.verified_by}</p>
-                          )}
+                          {conf.verified_by && <p>oleh: {conf.verified_by}</p>}
                           {conf.verified_at && (
                             <p>{formatDate(conf.verified_at)}</p>
                           )}
@@ -496,12 +512,14 @@ export default function DashboardPage() {
           <DialogHeader>
             <DialogTitle>Bukti Pembayaran</DialogTitle>
           </DialogHeader>
-          <div className="bg-slate-100 dark:bg-slate-900 rounded-lg min-h-[300px] flex items-center justify-center overflow-hidden">
+          <div className="bg-slate-100 dark:bg-slate-900 rounded-lg min-h-[300px] flex items-center justify-center overflow-hidden relative">
             {selectedProof && (
-              <img
+              <Image
                 src={selectedProof}
                 alt="Payment Proof"
-                className="max-w-full max-h-[60vh] object-contain"
+                fill
+                className="object-contain"
+                unoptimized
               />
             )}
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -149,10 +150,13 @@ export default function AdminSidebar({
       <div className="p-4 border-t border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50">
           {user.photo_url ? (
-            <img
+            <Image
               src={user.photo_url}
               alt={user.nama}
-              className="w-10 h-10 rounded-full border border-white dark:border-slate-800 shadow-sm object-cover"
+              width={40}
+              height={40}
+              className="rounded-full border border-white dark:border-slate-800 shadow-sm object-cover"
+              unoptimized
             />
           ) : (
             <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
