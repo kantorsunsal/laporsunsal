@@ -1572,7 +1572,7 @@ function verifyPassword(input, stored) {
 
 function generateToken(userId, email) {
   const secret = getSecretKey();
-  const payload = { userId, email, exp: Date.now() + 24 * 60 * 60 * 1000 };
+  const payload = { userId, email, exp: Date.now() + 6 * 60 * 60 * 1000 }; // 6 jam session timeout
   const encoded = Utilities.base64Encode(JSON.stringify(payload));
   const sig = Utilities.base64Encode(
     Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, encoded + secret)

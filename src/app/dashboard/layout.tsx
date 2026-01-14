@@ -41,10 +41,25 @@ export default function DashboardLayout({
     // Check for admin user in localStorage
     const savedUser = localStorage.getItem("admin_user");
     const token = localStorage.getItem("admin_token");
+    const loginTime = localStorage.getItem("admin_login_time");
 
     if (!savedUser || !token) {
       router.replace("/dashboard/login");
       return;
+    }
+
+    // Check if session has expired (6 hours = 21600000 ms)
+    const SESSION_DURATION = 6 * 60 * 60 * 1000; // 6 jam
+    if (loginTime) {
+      const elapsed = Date.now() - parseInt(loginTime, 10);
+      if (elapsed > SESSION_DURATION) {
+        // Session expired, force logout
+        localStorage.removeItem("admin_user");
+        localStorage.removeItem("admin_token");
+        localStorage.removeItem("admin_login_time");
+        router.replace("/dashboard/login");
+        return;
+      }
     }
 
     try {
@@ -69,6 +84,7 @@ export default function DashboardLayout({
   const handleLogout = () => {
     localStorage.removeItem("admin_user");
     localStorage.removeItem("admin_token");
+    localStorage.removeItem("admin_login_time");
     router.replace("/dashboard/login");
   };
 

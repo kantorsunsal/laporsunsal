@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 const AUTH_API_URL = "https://laporsunsal-api.kantorsunsal.workers.dev";
 const GAS_URL =
-  "https://script.google.com/macros/s/AKfycbw4f2llt5PmGdWXOrM1Bz0C4dCPXMMpNOmaoC_VwIOq6YsxVzFSuiWK9N9t7fil87JAcQ/exec";
+  "https://script.google.com/macros/s/AKfycbxpxFHWltbv_NkQkHq7bBweDwc68lytmmYiLC_0L7vDCE5EdrGqfLDithNg44MayeoS1w/exec";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -73,6 +73,7 @@ export default function AdminLoginPage() {
         // Store user data and token
         localStorage.setItem("admin_user", JSON.stringify(result.user));
         localStorage.setItem("admin_token", result.token);
+        localStorage.setItem("admin_login_time", Date.now().toString()); // Simpan waktu login untuk session timeout
 
         toast.success("Login berhasil!");
         router.push("/dashboard");
