@@ -31,6 +31,7 @@ interface User {
   role: string;
   created: string;
   status: string;
+  is_verified?: boolean;
 }
 
 export default function UsersPage() {
@@ -41,6 +42,7 @@ export default function UsersPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [editRole, setEditRole] = useState("");
   const [currentUserRole, setCurrentUserRole] = useState("");
@@ -151,6 +153,40 @@ export default function UsersPage() {
         fetchUsers();
       } else {
         toast.error(result.error || "Gagal menghapus user");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Terjadi kesalahan");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleManualVerify = async () => {
+    if (!selectedUser) return;
+
+    setProcessing(true);
+    try {
+      const token = localStorage.getItem("admin_token");
+
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "manual_verify_email",
+          user_id: selectedUser.id,
+          token: token,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success("Email berhasil diverifikasi");
+        setVerifyDialogOpen(false);
+        fetchUsers();
+      } else {
+        toast.error(result.error || "Gagal memverifikasi email");
       }
     } catch (error) {
       console.error(error);
@@ -275,6 +311,32 @@ export default function UsersPage() {
     );
   };
 
+  const getEmailVerifiedBadge = (
+    isVerified: boolean | undefined,
+    role: string
+  ) => {
+    // Admin/Super Admin selalu dianggap terverifikasi
+    if (role === "admin" || role === "super_admin") {
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-semibold bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400 rounded-full inline-flex items-center gap-1">
+          <span className="material-symbols-outlined text-xs">verified</span>
+          Terverifikasi
+        </span>
+      );
+    }
+    return isVerified ? (
+      <span className="px-2 py-0.5 text-[10px] font-semibold bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400 rounded-full inline-flex items-center gap-1">
+        <span className="material-symbols-outlined text-xs">verified</span>
+        Terverifikasi
+      </span>
+    ) : (
+      <span className="px-2 py-0.5 text-[10px] font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400 rounded-full inline-flex items-center gap-1">
+        <span className="material-symbols-outlined text-xs">pending</span>
+        Belum Verifikasi
+      </span>
+    );
+  };
+
   const filteredUsers = users.filter((u) => {
     // Hide super_admin from admin view (only super_admin can see super_admins)
     if (currentUserRole === "admin" && u.role === "super_admin") {
@@ -323,11 +385,10 @@ export default function UsersPage() {
           </Button>
           {/* Add User Button - Only super_admin */}
           {currentUserRole === "super_admin" && (
-            <Button
-              onClick={() => setAddDialogOpen(true)}
-              className="shrink-0"
-            >
-              <span className="material-symbols-outlined mr-2 text-lg">person_add</span>
+            <Button onClick={() => setAddDialogOpen(true)} className="shrink-0">
+              <span className="material-symbols-outlined mr-2 text-lg">
+                person_add
+              </span>
               Tambah User
             </Button>
           )}
@@ -370,6 +431,9 @@ export default function UsersPage() {
                   <th className="px-4 lg:px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     Role
                   </th>
+                  <th className="px-4 lg:px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden sm:table-cell">
+                    Email
+                  </th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden lg:table-cell">
                     Status
                   </th>
@@ -410,6 +474,9 @@ export default function UsersPage() {
                     <td className="px-4 lg:px-6 py-4">
                       {getRoleBadge(user.role)}
                     </td>
+                    <td className="px-4 lg:px-6 py-4 hidden sm:table-cell">
+                      {getEmailVerifiedBadge(user.is_verified, user.role)}
+                    </td>
                     <td className="px-4 lg:px-6 py-4 hidden lg:table-cell">
                       {getStatusBadge(user.status)}
                     </td>
@@ -420,6 +487,23 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 lg:px-6 py-4">
                       <div className="flex items-center justify-end gap-1">
+                        {/* Verify Email button - Only for super_admin and unverified users */}
+                        {currentUserRole === "super_admin" &&
+                          user.role === "user" &&
+                          !user.is_verified && (
+                            <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setVerifyDialogOpen(true);
+                              }}
+                              className="p-2 text-green-600 hover:bg-green-100 dark:hover:bg-green-500/20 rounded-lg transition-all"
+                              title="Verifikasi Email"
+                            >
+                              <span className="material-symbols-outlined">
+                                verified
+                              </span>
+                            </button>
+                          )}
                         {/* Only super_admin can edit roles */}
                         {currentUserRole === "super_admin" && (
                           <button
@@ -549,7 +633,9 @@ export default function UsersPage() {
                 placeholder="Masukkan nama lengkap"
                 className="h-11 rounded-lg"
                 value={newUser.nama}
-                onChange={(e) => setNewUser({ ...newUser, nama: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, nama: e.target.value })
+                }
               />
             </div>
             <div>
@@ -559,7 +645,9 @@ export default function UsersPage() {
                 placeholder="contoh@email.com"
                 className="h-11 rounded-lg"
                 value={newUser.email}
-                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, email: e.target.value })
+                }
               />
             </div>
             <div>
@@ -569,7 +657,9 @@ export default function UsersPage() {
                 placeholder="Minimal 6 karakter"
                 className="h-11 rounded-lg"
                 value={newUser.password}
-                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, password: e.target.value })
+                }
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -579,7 +669,9 @@ export default function UsersPage() {
                   placeholder="08xxxxxxxxxx"
                   className="h-11 rounded-lg"
                   value={newUser.phone}
-                  onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                  onChange={(e) =>
+                    setNewUser({ ...newUser, phone: e.target.value })
+                  }
                 />
               </div>
               <div>
@@ -588,13 +680,20 @@ export default function UsersPage() {
                   placeholder="Nama lembaga"
                   className="h-11 rounded-lg"
                   value={newUser.lembaga}
-                  onChange={(e) => setNewUser({ ...newUser, lembaga: e.target.value })}
+                  onChange={(e) =>
+                    setNewUser({ ...newUser, lembaga: e.target.value })
+                  }
                 />
               </div>
             </div>
             <div>
               <Label className="mb-2 block">Role</Label>
-              <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value })}>
+              <Select
+                value={newUser.role}
+                onValueChange={(value) =>
+                  setNewUser({ ...newUser, role: value })
+                }
+              >
                 <SelectTrigger className="h-11 rounded-lg">
                   <SelectValue placeholder="Pilih role" />
                 </SelectTrigger>
@@ -611,7 +710,14 @@ export default function UsersPage() {
               variant="outline"
               onClick={() => {
                 setAddDialogOpen(false);
-                setNewUser({ nama: "", email: "", password: "", phone: "", lembaga: "", role: "user" });
+                setNewUser({
+                  nama: "",
+                  email: "",
+                  password: "",
+                  phone: "",
+                  lembaga: "",
+                  role: "user",
+                });
               }}
               disabled={processing}
             >
@@ -619,6 +725,48 @@ export default function UsersPage() {
             </Button>
             <Button onClick={handleAddUser} disabled={processing}>
               {processing ? "Menyimpan..." : "Tambah User"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Verify Email Confirmation Dialog */}
+      <Dialog open={verifyDialogOpen} onOpenChange={setVerifyDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Verifikasi Email Manual</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-slate-600 dark:text-slate-400">
+              Verifikasi email untuk user <strong>{selectedUser?.nama}</strong>?
+            </p>
+            <p className="text-sm text-slate-500 mt-2">
+              Email: <strong>{selectedUser?.email}</strong>
+            </p>
+            <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-500/10 rounded-lg border border-yellow-200 dark:border-yellow-500/20">
+              <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                <span className="material-symbols-outlined text-sm align-middle mr-1">
+                  info
+                </span>
+                Gunakan fitur ini jika user tidak dapat menerima email
+                verifikasi.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setVerifyDialogOpen(false)}
+              disabled={processing}
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={handleManualVerify}
+              disabled={processing}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {processing ? "Memverifikasi..." : "Verifikasi Email"}
             </Button>
           </DialogFooter>
         </DialogContent>

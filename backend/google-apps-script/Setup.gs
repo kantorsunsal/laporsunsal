@@ -769,6 +769,10 @@ function doPost(e) {
       case "update_profile":
         return handleUpdateProfile(data);
 
+      // Manual Email Verification (Super Admin only)
+      case "manual_verify_email":
+        return handleManualVerifyEmail(data);
+
       // Email & Password Reset Actions (untuk Cloudflare Worker)
       case "verify_email":
         return handleVerifyEmailToken(data);
@@ -1875,6 +1879,7 @@ function handleGetAllUsers(data) {
       role: users[i][6],
       created: users[i][7],
       status: users[i][8],
+      is_verified: users[i][10] ? true : false, // Kolom 11 (index 10) = Is_Verified
     });
   }
 
@@ -1901,6 +1906,84 @@ const ROLE_HIERARCHY = {
  */
 function hasPermission(userRole, requiredRole) {
   return (ROLE_HIERARCHY[userRole] || 0) >= (ROLE_HIERARCHY[requiredRole] || 0);
+}
+
+// ============================================
+// MANUAL EMAIL VERIFICATION (Super Admin Only)
+// ============================================
+
+/**
+ * Handler untuk verifikasi email manual oleh Super Admin
+ * Digunakan ketika user tidak bisa menerima email verifikasi
+ */
+function handleManualVerifyEmail(data) {
+  const { token, user_id } = data;
+
+  // Validasi parameter
+  if (!token || !user_id) {
+    return jsonResponse({
+      success: false,
+      error: "Token dan User ID wajib diisi",
+    });
+  }
+
+  // Decode dan validasi token
+  const decoded = decodeToken(token);
+  if (!decoded || decoded.expired) {
+    return jsonResponse({ success: false, error: "Token tidak valid" });
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+  const users = sheet.getDataRange().getValues();
+
+  // Cari requester dan validasi role
+  let requesterRole = null;
+  let requesterName = "";
+  for (let i = 1; i < users.length; i++) {
+    if (users[i][0] === decoded.userId) {
+      requesterRole = users[i][6];
+      requesterName = users[i][1];
+      break;
+    }
+  }
+
+  // Hanya super_admin yang boleh verifikasi manual
+  if (requesterRole !== "super_admin") {
+    return jsonResponse({
+      success: false,
+      error: "Hanya Super Admin yang dapat melakukan verifikasi email manual",
+    });
+  }
+
+  // Cari target user dan update is_verified
+  for (let i = 1; i < users.length; i++) {
+    if (users[i][0] === user_id) {
+      // Cek apakah sudah terverifikasi
+      if (users[i][10]) {
+        return jsonResponse({
+          success: false,
+          error: "Email user sudah terverifikasi",
+        });
+      }
+
+      // Update Is_Verified menjadi 1 (kolom 11, index ke-11 di sheet = setColumnIndex 11)
+      sheet.getRange(i + 1, 11).setValue(1);
+
+      // Log aktivitas
+      logActivity(
+        "MANUAL_EMAIL_VERIFY",
+        decoded.userId,
+        `Super Admin "${requesterName}" verified email for user: ${users[i][2]} (${user_id})`
+      );
+
+      return jsonResponse({
+        success: true,
+        message: `Email ${users[i][2]} berhasil diverifikasi`,
+      });
+    }
+  }
+
+  return jsonResponse({ success: false, error: "User tidak ditemukan" });
 }
 
 // ============================================

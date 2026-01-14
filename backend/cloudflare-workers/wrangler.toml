@@ -14,7 +14,7 @@ bucket_name = "laporsunsal"
 # ============================================
 [vars]
 # URL Google Apps Script Web App (database backend)
-GAS_URL = "https://script.google.com/macros/s/AKfycbw4f2llt5PmGdWXOrM1Bz0C4dCPXMMpNOmaoC_VwIOq6YsxVzFSuiWK9N9t7fil87JAcQ/exec"
+GAS_URL = "https://script.google.com/macros/s/AKfycbwChfov4XM5ysPVq-7lfxkz78z2xDyVKIfrhjduMSKAPXX4KWpMLneHuJRsonBB8h6ZIA/exec"
 
 # Frontend URL (Production)
 APP_URL = "https://laporsunsal.vercel.app"
