@@ -772,6 +772,8 @@ function doPost(e) {
       // Manual Email Verification (Super Admin only)
       case "manual_verify_email":
         return handleManualVerifyEmail(data);
+      case "resend_verification_email":
+        return handleResendVerificationEmail(data);
 
       // Email & Password Reset Actions (untuk Cloudflare Worker)
       case "verify_email":
@@ -1979,6 +1981,92 @@ function handleManualVerifyEmail(data) {
       return jsonResponse({
         success: true,
         message: `Email ${users[i][2]} berhasil diverifikasi`,
+      });
+    }
+  }
+
+  return jsonResponse({ success: false, error: "User tidak ditemukan" });
+}
+
+/**
+ * Handler untuk kirim ulang email verifikasi
+ * Super Admin dapat mengirim ulang email verifikasi ke user yang belum terverifikasi
+ */
+function handleResendVerificationEmail(data) {
+  const { token, user_id } = data;
+
+  // Validasi parameter
+  if (!token || !user_id) {
+    return jsonResponse({
+      success: false,
+      error: "Token dan User ID wajib diisi",
+    });
+  }
+
+  // Decode dan validasi token
+  const decoded = decodeToken(token);
+  if (!decoded || decoded.expired) {
+    return jsonResponse({ success: false, error: "Token tidak valid" });
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+  const users = sheet.getDataRange().getValues();
+
+  // Cari requester dan validasi role (hanya super_admin)
+  let requesterRole = null;
+  let requesterName = "";
+  for (let i = 1; i < users.length; i++) {
+    if (users[i][0] === decoded.userId) {
+      requesterRole = users[i][6];
+      requesterName = users[i][1];
+      break;
+    }
+  }
+
+  if (requesterRole !== "super_admin") {
+    return jsonResponse({
+      success: false,
+      error: "Hanya Super Admin yang dapat mengirim ulang email verifikasi",
+    });
+  }
+
+  // Cari target user
+  for (let i = 1; i < users.length; i++) {
+    if (users[i][0] === user_id) {
+      // Cek apakah sudah terverifikasi
+      if (users[i][10]) {
+        return jsonResponse({
+          success: false,
+          error: "Email user sudah terverifikasi",
+        });
+      }
+
+      // Generate verification token baru
+      const verificationToken =
+        "V-" +
+        Math.random().toString(36).substring(2, 15) +
+        Math.random().toString(36).substring(2, 15);
+
+      // Update verification token di sheet (kolom 12, index 11)
+      sheet.getRange(i + 1, 12).setValue(verificationToken);
+
+      // Log aktivitas
+      logActivity(
+        "RESEND_VERIFICATION_EMAIL",
+        decoded.userId,
+        `Super Admin "${requesterName}" requested resend verification email for: ${users[i][2]} (${user_id})`
+      );
+
+      // Return data untuk Cloudflare Worker mengirim email
+      return jsonResponse({
+        success: true,
+        message: "Token verifikasi berhasil dibuat",
+        user: {
+          id: users[i][0],
+          nama: users[i][1],
+          email: users[i][2],
+        },
+        verification_token: verificationToken,
       });
     }
   }

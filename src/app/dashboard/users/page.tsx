@@ -43,6 +43,7 @@ export default function UsersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+  const [resendDialogOpen, setResendDialogOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [editRole, setEditRole] = useState("");
   const [currentUserRole, setCurrentUserRole] = useState("");
@@ -187,6 +188,39 @@ export default function UsersPage() {
         fetchUsers();
       } else {
         toast.error(result.error || "Gagal memverifikasi email");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Terjadi kesalahan");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!selectedUser) return;
+
+    setProcessing(true);
+    try {
+      const token = localStorage.getItem("admin_token");
+
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "resend_verification_email",
+          user_id: selectedUser.id,
+          token: token,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(result.message || "Email verifikasi berhasil dikirim");
+        setResendDialogOpen(false);
+      } else {
+        toast.error(result.error || "Gagal mengirim email");
       }
     } catch (error) {
       console.error(error);
@@ -425,9 +459,6 @@ export default function UsersPage() {
                   <th className="px-4 lg:px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     User
                   </th>
-                  <th className="px-4 lg:px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden md:table-cell">
-                    Lembaga
-                  </th>
                   <th className="px-4 lg:px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     Role
                   </th>
@@ -468,9 +499,6 @@ export default function UsersPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 lg:px-6 py-4 hidden md:table-cell">
-                      <p className="text-sm">{user.lembaga || "-"}</p>
-                    </td>
                     <td className="px-4 lg:px-6 py-4">
                       {getRoleBadge(user.role)}
                     </td>
@@ -501,6 +529,23 @@ export default function UsersPage() {
                             >
                               <span className="material-symbols-outlined">
                                 verified
+                              </span>
+                            </button>
+                          )}
+                        {/* Resend Email button - Only for super_admin and unverified users */}
+                        {currentUserRole === "super_admin" &&
+                          user.role === "user" &&
+                          !user.is_verified && (
+                            <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setResendDialogOpen(true);
+                              }}
+                              className="p-2 text-orange-500 hover:bg-orange-100 dark:hover:bg-orange-500/20 rounded-lg transition-all"
+                              title="Kirim Ulang Email Verifikasi"
+                            >
+                              <span className="material-symbols-outlined">
+                                mail
                               </span>
                             </button>
                           )}
@@ -767,6 +812,47 @@ export default function UsersPage() {
               className="bg-green-600 hover:bg-green-700"
             >
               {processing ? "Memverifikasi..." : "Verifikasi Email"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resend Verification Email Dialog */}
+      <Dialog open={resendDialogOpen} onOpenChange={setResendDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Kirim Ulang Email Verifikasi</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-slate-600 dark:text-slate-400">
+              Kirim email verifikasi ke <strong>{selectedUser?.nama}</strong>?
+            </p>
+            <p className="text-sm text-slate-500 mt-2">
+              Email: <strong>{selectedUser?.email}</strong>
+            </p>
+            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-500/10 rounded-lg border border-blue-200 dark:border-blue-500/20">
+              <p className="text-sm text-blue-700 dark:text-blue-400">
+                <span className="material-symbols-outlined text-sm align-middle mr-1">
+                  info
+                </span>
+                Email berisi link verifikasi akan dikirim ke alamat email user.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setResendDialogOpen(false)}
+              disabled={processing}
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={handleResendVerification}
+              disabled={processing}
+              className="bg-orange-500 hover:bg-orange-600"
+            >
+              {processing ? "Mengirim..." : "Kirim Email"}
             </Button>
           </DialogFooter>
         </DialogContent>

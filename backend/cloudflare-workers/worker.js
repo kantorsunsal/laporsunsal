@@ -826,6 +826,36 @@ async function handleProxy(request, env) {
   }
 
   const result = await callGoogleSheetsAPI(env, body.action, body);
+
+  // Special handling untuk resend_verification_email - kirim email setelah dapat token
+  if (
+    body.action === "resend_verification_email" &&
+    result.success &&
+    result.verification_token &&
+    result.user
+  ) {
+    console.log("=== RESEND VERIFICATION EMAIL ===");
+    console.log("Sending verification email to:", result.user.email);
+
+    const baseUrl = env.APP_URL || "https://laporsunsal.vercel.app";
+    const verifyUrl = `${baseUrl}/auth/verify?token=${result.verification_token}`;
+
+    const emailResult = await sendEmail(
+      env,
+      result.user.email,
+      "Verifikasi Email - LaporSunsal",
+      verificationEmailTemplate(result.user.nama, verifyUrl)
+    );
+
+    console.log("Email send result:", JSON.stringify(emailResult));
+
+    // Return success tanpa expose token ke frontend
+    return jsonResponse({
+      success: true,
+      message: `Email verifikasi berhasil dikirim ke ${result.user.email}`,
+    });
+  }
+
   return jsonResponse(result, result.success ? 200 : 400);
 }
 
