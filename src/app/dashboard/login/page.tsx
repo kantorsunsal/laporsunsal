@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 const AUTH_API_URL = "https://laporsunsal-api.kantorsunsal.workers.dev";
 const GAS_URL =
-  "https://script.google.com/macros/s/AKfycbxpxFHWltbv_NkQkHq7bBweDwc68lytmmYiLC_0L7vDCE5EdrGqfLDithNg44MayeoS1w/exec";
+  "https://script.google.com/macros/s/AKfycbyXhNAZOmAFuEG-F1W_n2pdT1seuaqIMWAzdmzBznE-_ItTpouWjjjVPdWCDJp5nCBKow/exec";
 
 export default function AdminLoginPage() {
   const router = useRouter();

@@ -12,7 +12,7 @@ import { toast } from "sonner";
 // Ganti dengan URL Web App GAS Auth Anda
 const AUTH_API_URL = "https://laporsunsal-api.kantorsunsal.workers.dev";
 const GAS_URL =
-  "https://script.google.com/macros/s/AKfycbxpxFHWltbv_NkQkHq7bBweDwc68lytmmYiLC_0L7vDCE5EdrGqfLDithNg44MayeoS1w/exec";
+  "https://script.google.com/macros/s/AKfycbyXhNAZOmAFuEG-F1W_n2pdT1seuaqIMWAzdmzBznE-_ItTpouWjjjVPdWCDJp5nCBKow/exec";
 
 interface AuthFormProps {
   onAuthSuccess: (user: User) => void;

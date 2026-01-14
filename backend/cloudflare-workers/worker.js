@@ -38,7 +38,7 @@ const CORS_HEADERS = {
 const JWT_SECRET = "laporsunsal-jwt-secret-key-2026"; // Override via env.JWT_SECRET
 
 const DEFAULT_GAS_URL =
-  "https://script.google.com/macros/s/AKfycbxpxFHWltbv_NkQkHq7bBweDwc68lytmmYiLC_0L7vDCE5EdrGqfLDithNg44MayeoS1w/exec";
+  "https://script.google.com/macros/s/AKfycbyXhNAZOmAFuEG-F1W_n2pdT1seuaqIMWAzdmzBznE-_ItTpouWjjjVPdWCDJp5nCBKow/exec";
 
 // ============================================
 // HELPER FUNCTIONS
