@@ -52,7 +52,6 @@ export default function UsersPage() {
     email: "",
     password: "",
     phone: "",
-    lembaga: "",
     role: "user",
   });
 
@@ -252,7 +251,6 @@ export default function UsersPage() {
           email: newUser.email.toLowerCase(),
           password: newUser.password,
           phone: newUser.phone,
-          lembaga: newUser.lembaga,
         }),
       });
 
@@ -281,7 +279,6 @@ export default function UsersPage() {
           email: "",
           password: "",
           phone: "",
-          lembaga: "",
           role: "user",
         });
         fetchUsers();
@@ -707,29 +704,16 @@ export default function UsersPage() {
                 }
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="mb-2 block">No. HP</Label>
-                <Input
-                  placeholder="08xxxxxxxxxx"
-                  className="h-11 rounded-lg"
-                  value={newUser.phone}
-                  onChange={(e) =>
-                    setNewUser({ ...newUser, phone: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <Label className="mb-2 block">Lembaga</Label>
-                <Input
-                  placeholder="Nama lembaga"
-                  className="h-11 rounded-lg"
-                  value={newUser.lembaga}
-                  onChange={(e) =>
-                    setNewUser({ ...newUser, lembaga: e.target.value })
-                  }
-                />
-              </div>
+            <div>
+              <Label className="mb-2 block">No. HP</Label>
+              <Input
+                placeholder="08xxxxxxxxxx"
+                className="h-11 rounded-lg"
+                value={newUser.phone}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, phone: e.target.value })
+                }
+              />
             </div>
             <div>
               <Label className="mb-2 block">Role</Label>
@@ -760,7 +744,6 @@ export default function UsersPage() {
                   email: "",
                   password: "",
                   phone: "",
-                  lembaga: "",
                   role: "user",
                 });
               }}
