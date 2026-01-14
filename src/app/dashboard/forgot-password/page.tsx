@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 const AUTH_API_URL = "https://laporsunsal-api.kantorsunsal.workers.dev";
 const GAS_URL =
-  "https://script.google.com/macros/s/AKfycbyXhNAZOmAFuEG-F1W_n2pdT1seuaqIMWAzdmzBznE-_ItTpouWjjjVPdWCDJp5nCBKow/exec";
+  "https://script.google.com/macros/s/AKfycbyiZxCXYtwxGcrOo4dwAH-WnOMA42Ul1QJKzYMmJZ2vkyOEUrGTLWnClXYfGrPXarmPZQ/exec";
 
 export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
