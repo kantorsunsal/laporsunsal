@@ -1857,10 +1857,13 @@ function handleGetAllUsers(data) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
   const users = sheet.getDataRange().getValues();
 
-  // Cek apakah requester adalah admin
+  // Cek apakah requester adalah admin atau super_admin
   let isAdmin = false;
   for (let i = 1; i < users.length; i++) {
-    if (users[i][0] === decoded.userId && users[i][6] === "admin") {
+    if (
+      users[i][0] === decoded.userId &&
+      (users[i][6] === "admin" || users[i][6] === "super_admin")
+    ) {
       isAdmin = true;
       break;
     }
@@ -1872,6 +1875,13 @@ function handleGetAllUsers(data) {
 
   const userList = [];
   for (let i = 1; i < users.length; i++) {
+    const isVerifiedRaw = users[i][10];
+    const isVerified =
+      isVerifiedRaw === 1 ||
+      isVerifiedRaw === "1" ||
+      isVerifiedRaw === true ||
+      String(isVerifiedRaw).toLowerCase() === "true";
+
     userList.push({
       id: users[i][0],
       nama: users[i][1],
@@ -1881,7 +1891,7 @@ function handleGetAllUsers(data) {
       role: users[i][6],
       created: users[i][7],
       status: users[i][8],
-      is_verified: users[i][10] ? true : false, // Kolom 11 (index 10) = Is_Verified
+      is_verified: isVerified,
     });
   }
 
