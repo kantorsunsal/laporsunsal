@@ -666,6 +666,63 @@ async function handleResetPassword(request, env) {
   }
 }
 
+/**
+ * POST /auth/resend-verification
+ */
+async function handleResendVerification(request, env) {
+  const body = await parseBody(request);
+  const { email } = body;
+
+  if (!email) {
+    return jsonResponse({ success: false, error: "Email wajib diisi" }, 400);
+  }
+
+  try {
+    // Call GAS to generate new token
+    const result = await callGoogleSheetsAPI(env, "public_resend_verification", {
+      email: email.toLowerCase(),
+    });
+
+    if (!result.success) {
+      return jsonResponse(
+        { success: false, error: result.error || "Gagal memproses permintaan" },
+        400
+      );
+    }
+
+    // Send email if token received
+    if (result.verification_token) {
+      const baseUrl = env.APP_URL || "https://laporsunsal.pages.dev";
+      const verifyUrl = `${baseUrl}/auth/verify?token=${result.verification_token}`;
+
+      console.log("Resending verification email to:", email);
+
+      const emailResult = await sendEmail(
+        env,
+        email,
+        "Verifikasi Email - LaporSunsal",
+        verificationEmailTemplate(result.user.nama, verifyUrl)
+      );
+
+      return jsonResponse({
+        success: true,
+        message: "Link verifikasi telah dikirim ulang ke email Anda.",
+      });
+    } else {
+      return jsonResponse({
+        success: false,
+        error: "Gagal mendapatkan token verifikasi",
+      });
+    }
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    return jsonResponse(
+      { success: false, error: "Terjadi kesalahan server" },
+      500
+    );
+  }
+}
+
 // ============================================
 // USER HANDLERS (PROTECTED)
 // ============================================
@@ -1013,6 +1070,10 @@ async function handleRequest(request, env) {
 
   if (path === "/auth/reset-password" && method === "POST") {
     return handleResetPassword(request, env);
+  }
+
+  if (path === "/auth/resend-verification" && method === "POST") {
+    return handleResendVerification(request, env);
   }
 
   // User routes (protected)
